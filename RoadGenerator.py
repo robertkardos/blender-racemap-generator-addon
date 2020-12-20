@@ -90,7 +90,6 @@ class RunRoadBaking(bpy.types.Operator):
                     
                     if distance < RANGE_OF_INTERSECTION:
                         roadsCloseToIntersection.append(road)
-#                    bpy.ops.object.empty_add(location=v2)
                 bm.clear()
             
             if len(roadsCloseToIntersection) > 0:
@@ -106,9 +105,7 @@ class RunRoadBaking(bpy.types.Operator):
     @staticmethod
     def connectRoadsInIntersection(roads, intersection): # fuck this specifically
         roadPairGenerator = createCircularIterator(roads)
-        
-#        bpy.ops.curve.simple(Simple_Type="Point", align='WORLD', location=intersection.location)
-#        intersectionObject = bpy.context.object
+
         roadSides = []
         roadSidesBMesh = []
         intersectionEntrancePoints = []
@@ -117,43 +114,12 @@ class RunRoadBaking(bpy.types.Operator):
             bpy.ops.curve.primitive_bezier_curve_add(enter_editmode=False, align='WORLD', location=intersection.location)
             curve = bpy.context.object
             roadSides.append(curve)
-#            breakpoint()
-#            distLL = math.dist(roadPair[0].metadata["Left_0"][0],  roadPair[1].metadata["Left_0"][0])
-#            distLR = math.dist(roadPair[0].metadata["Left_0"][0],  roadPair[1].metadata["Right_0"][0])
-#            distRL = math.dist(roadPair[0].metadata["Right_0"][0], roadPair[1].metadata["Left_0"][0])
-#            distRR = math.dist(roadPair[0].metadata["Right_0"][0], roadPair[1].metadata["Right_0"][0])
-#            
-#            distances = [distLL, distLR, distRL, distRR]
-#            minDistance = min(distances)
-#            
-#            if minDistance == distLL:
-#                p1 = roadPair[0].metadata["Left_0"][0]
-#                p2 = roadPair[1].metadata["Left_0"][0]
-#                h1 = roadPair[0].metadata["Left_0"][1]
-#                h2 = roadPair[1].metadata["Left_0"][1]
-#            if minDistance == distLR:
-#                p1 = roadPair[0].metadata["Left_0"][0]
-#                p2 = roadPair[1].metadata["Right_0"][0]
-#                h1 = roadPair[0].metadata["Left_0"][1]
-#                h2 = roadPair[1].metadata["Right_0"][1]
-#            if minDistance == distRL:
-#                p1 = roadPair[0].metadata["Right_0"][0]
-#                p2 = roadPair[1].metadata["Left_0"][0]
-#                h1 = roadPair[0].metadata["Right_0"][1]
-#                h2 = roadPair[1].metadata["Left_0"][1]
-#            if minDistance == distRR:
-#                p1 = roadPair[0].metadata["Right_0"][0]
-#                p2 = roadPair[1].metadata["Right_0"][0]
-#                h1 = roadPair[0].metadata["Right_0"][1]
-#                h2 = roadPair[1].metadata["Right_0"][1]
-            
+
             p1 = roadPair[0].metadata["Left_0"][0]
             p2 = roadPair[1].metadata["Right_0"][0]
             h1 = roadPair[0].metadata["Left_0"][1]
             h2 = roadPair[1].metadata["Right_0"][1]
-#            breakpoint()
-#            RunRoadBaking.drawLine(p1, p2)
-            
+
             minDistance = math.dist(p1, p2)
             
             curve.data.splines[0].bezier_points[0].handle_left = h1 - curve.location
@@ -182,8 +148,7 @@ class RunRoadBaking(bpy.types.Operator):
 
             bpy.context.view_layer.objects.active = curve
             curve.select_set(True)
-#            breakpoint()
-#            bpy.ops.object.editmode_toggle()
+
             bpy.ops.object.convert(target="MESH")
 
             firstVertex = curve.data.vertices[0]
@@ -505,8 +470,6 @@ class RunRoadBaking(bpy.types.Operator):
 
 
 
-
-
 def register():
     bpy.utils.register_class(HelloWorldPanel)
     bpy.utils.register_class(RunRoadBaking)
@@ -517,32 +480,6 @@ def unregister():
 
 if __name__ == "__main__":
     register()
-
-
-# bpy.context.object.scale[1] = 5
-#bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
-#bpy.ops.object.modifier_add(type='ARRAY')
-#bpy.context.object.modifiers["Array"].fit_type = 'FIT_CURVE'
-#bpy.context.object.modifiers["Array"].curve = bpy.data.objects["BezierCurve"]
-#bpy.context.object.modifiers["Array"].use_merge_vertices = True
-
-#bpy.ops.object.modifier_add(type='CURVE')
-#bpy.context.object.modifiers["Curve"].object = bpy.data.objects["BezierCurve"]
-
-#bpy.ops.object.constraint_add(type='COPY_LOCATION')
-#bpy.context.object.constraints["Copy Location"].target = bpy.data.objects["BezierCurve"]
-
-#bpy.ops.object.modifier_apply(apply_as='DATA', modifier="Array")
-#bpy.ops.object.modifier_apply(apply_as='DATA', modifier="Curve")
-
-#bpy.context.object.location[0] = 6.48727
-#bpy.context.object.location[0] = 6.48727
-#bpy.context.object.location[0] = 6.48727
-#bpy.ops.constraint.delete()
-
-
-
-
 
 #        self.report({'INFO'}, "BAKING ROADS...")
 #        intersection = context.road_object
@@ -559,10 +496,8 @@ if __name__ == "__main__":
 #            print(v.co)
 #        else:
 #            print("Object is not in edit mode.")
-        
-        
-        
-        
+
+
 #        meshObjects = [o for o in bpy.context.scene.objects if o.type == "MESH" and o != context.road_object]
 #        for obj in meshObjects:
 #            dist = RunRoadBaking.distanceOfObjects(intersection, obj)
@@ -570,5 +505,3 @@ if __name__ == "__main__":
 #                print("close enough: ", round(dist, 2), obj)
 #                RunRoadBaking.drawLine(context, intersectionLocation, obj.location)
 ##                bpy.ops.mesh.primitive_uv_sphere_add(location=obj.location)
-
-#        self.report({'INFO'}, "ROAD BAKING DONE")
