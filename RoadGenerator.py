@@ -111,10 +111,13 @@ class RunRoadBaking(bpy.types.Operator):
 
         roadSides = []
         roadSidesBMesh = []
+        roadSidesMesh = []
         intersectionEntranceCenterPoints = []
         intersectionEntranceLayerPoints = []
         
         roadSegments_BMesh = []
+        roadSegments_Mesh = []
+        roadSegmentObjects = []
         
         '''
         roadSegments = []
@@ -137,6 +140,7 @@ class RunRoadBaking(bpy.types.Operator):
         for roadPair in roadPairGenerator:
             roadSegmentLayers = []
             roadSegmentBMesh = bmesh.new()
+            
             '''
             for layer in range(1, len(layers):
             '''
@@ -154,6 +158,12 @@ class RunRoadBaking(bpy.types.Operator):
             roadSides.append(curve)
             roadSegmentLayers.append(curve)
             roadSegmentBMesh.from_mesh(curve.data)
+            roadSegmentMesh = curve
+#            roadSegmentObject = bpy.data.objects.new("RoadSegment" + str(random.randint(11, 1111)), roadSegmentMesh)
+            roadSegmentObject = curve
+            
+            bpy.ops.object.join()
+
             
             firstVertex = curve.data.vertices[0]
             lastVertex = curve.data.vertices[-1]
@@ -179,57 +189,83 @@ class RunRoadBaking(bpy.types.Operator):
             roadSegmentLayers.append(curve)
             roadSegmentBMesh.from_mesh(curve.data)
             
+            roadSegmentMesh.select_set(True)
+            roadSegmentMesh = curve
+#            toBeMerged = bpy.data.objects.new("TMP_RoadSegment" + str(random.randint(11, 1111)), roadSegmentMesh)
+            toBeMerged = curve
+
+            
             firstVertex = curve.data.vertices[0]
             lastVertex = curve.data.vertices[-1]
             
+            bpy.context.view_layer.objects.active = roadSegmentObject
+            roadSegmentObject.select_set(True)
+            toBeMerged.select_set(True)
+            bpy.ops.object.join()
+            
+            # add edges between layers
+            roadSegmentObject.data.edges.add(1)
+            edgeIndex = len(roadSegmentObject.data.edges) - 1
+            p1 = previousCurveEndVertices[0]
+            p2 = firstVertex.co
+            for v in roadSegmentObject.data.vertices:
+                if v.co == p1:
+                    vert1 = v.index
+            for v in roadSegmentObject.data.vertices:
+                if v.co == p2:
+                    vert2 = v.index
+            roadSegmentObject.data.edges[edgeIndex].vertices[0] = vert1
+            roadSegmentObject.data.edges[edgeIndex].vertices[1] = vert2
+#            roadSegmentObject.edges.new((vert1, vert2))
+#            roadSegments.append(roadSegmentLayers)
+
+            roadSegmentObject.data.edges.add(1)
+            edgeIndex = len(roadSegmentObject.data.edges) - 1
+            p1 = lastVertex.co
+            p2 = previousCurveEndVertices[1]
+            for v in roadSegmentObject.data.vertices:
+                if v.co == p1:
+                    vert1 = v.index
+            for v in roadSegmentObject.data.vertices:
+                if v.co == p2:
+                    vert2 = v.index
+            roadSegmentObject.data.edges[edgeIndex].vertices[0] = vert1
+            roadSegmentObject.data.edges[edgeIndex].vertices[1] = vert2
+#            roadSegmentObject.edges.new((vert1, vert2))
+#            roadSegments.append(roadSegmentLayers)
+            
+
             
             intersectionEntranceCenterPoints.append((firstVertex, lastVertex))
-
-            roadSegments_BMesh
 
 
 #            intersectionEntranceLayerPoints.append((previousCurveEndVertices[0].copy(), firstVertex.co.copy()))
 #            intersectionEntranceLayerPoints.append((lastVertex.co.copy(), previousCurveEndVertices[1].copy()))
 
 
-            p1 = previousCurveEndVertices[0]
-            p2 = firstVertex.co
-            for v in roadSegmentBMesh.verts:
-                if v.co == p1:
-                    vert1 = v
-            for v in roadSegmentBMesh.verts:
-                if v.co == p2:
-                    vert2 = v
-            roadSegmentBMesh.edges.new((vert1, vert2))
-#            roadSegments.append(roadSegmentLayers)
-
-            p1 = lastVertex.co
-            p2 = previousCurveEndVertices[1]
-            for v in roadSegmentBMesh.verts:
-                if v.co == p1:
-                    vert1 = v
-            for v in roadSegmentBMesh.verts:
-                if v.co == p2:
-                    vert2 = v
-            roadSegmentBMesh.edges.new((vert1, vert2))
-#            roadSegments.append(roadSegmentLayers)
             
             
             
-#            p1 = firstVertex
-#            p2 = intersectionEntranceCenterPoints[-1][1]
-#                
+            roadSegmentObject.data.edges.add(1)
+            edgeIndex = len(roadSegmentObject.data.edges) - 1
+            p1 = firstVertex
+            p2 = intersectionEntranceCenterPoints[-1][1]
+                
 #            p1.select = True
 #            p2.select = True
-#            
-#            for v in roadSegmentBMesh.verts:
-#                if v.co == p1.co:
-#                    vert1 = v
-#            for v in roadSegmentBMesh.verts:
-#                if v.co == p2.co:
-#                    vert2 = v
+            
+            for v in roadSegmentObject.data.vertices:
+                if v.co == p1.co:
+                    vert1 = v.index
+            for v in roadSegmentObject.data.vertices:
+                if v.co == p2.co:
+                    vert2 = v.index
+            roadSegmentObject.data.edges[edgeIndex].vertices[0] = vert1
+            roadSegmentObject.data.edges[edgeIndex].vertices[1] = vert2
 #            roadSegmentBMesh.edges.new((vert1, vert2))
             
+            bpy.ops.object.editmode_toggle()
+            bpy.ops.object.editmode_toggle()
             
             
             
@@ -241,6 +277,7 @@ class RunRoadBaking(bpy.types.Operator):
             
             roadSegments_BMesh.append(roadSegmentBMesh)
             
+            roadSegmentObjects.append(roadSegmentObject)
             
             
         
@@ -276,27 +313,6 @@ class RunRoadBaking(bpy.types.Operator):
         
         
         
-        
-        
-        
-
-#        
-#        
-#        for index, pair in enumerate(intersectionEntranceLayerPoints):
-#            print("Pair index: ", index, pair)
-#            p1 = pair[0]
-#            p2 = pair[1]
-#            for v in intersectionBMesh.verts:
-#                if v.co == p1:
-#                    vert1 = v
-#            for v in intersectionBMesh.verts:
-#                if v.co == p2:
-#                    vert2 = v
-#            try:
-#                intersectionBMesh.edges.new((vert1, vert2))
-#            except:
-#                print("POINT PAIR FAILED: ", pair[0], "\n", pair[1])
-        
         intersectionBMesh = bmesh.new()
         for roadSegmentBMesh in roadSegments_BMesh:
             tmpMesh = bpy.data.meshes.new("tmpMesh")
@@ -304,7 +320,23 @@ class RunRoadBaking(bpy.types.Operator):
             intersectionBMesh.from_mesh(tmpMesh)
         
         
-                
+        temp_mesh = bpy.data.meshes.new(".temp")
+        mergerObject = bpy.data.objects.new("IntersectionCLASSIC" + str(random.randint(11, 1111)), temp_mesh)
+        bpy.data.collections["Shaite"].objects.link(mergerObject)
+        for roadSegmentObject in roadSegmentObjects:
+#            bpy.context.view_layer.objects.active = mergerObject
+#            breakpoint()
+            roadSegmentObject.select_set(True)
+            mergerObject.select_set(True)
+            bpy.ops.object.join()
+            
+            mergerObject = bpy.context.object
+        
+        bpy.data.collections["Shaite"].objects.link(mergerObject)
+        
+        
+        
+        
         for index, entrance in enumerate(intersectionEntranceCenterPoints):
             if index == 0:
                 p1 = intersectionEntranceCenterPoints[0][0]
