@@ -2,6 +2,7 @@ import bpy, bmesh
 import math, mathutils
 import numpy as np
 import random
+import copy
 
 def createCircularIterator(roads):
     iterRoads = iter(roads)
@@ -58,6 +59,8 @@ class RunRoadBaking(bpy.types.Operator):
     def execute(self, context):
         print("BAKING ROADS...")
         RunRoadBaking.cleanUpCreatedRoads()
+        RunRoadBaking.cleanUpCreatedShaite()
+        
         scene = bpy.context.scene
         RANGE_OF_INTERSECTION = 10
         
@@ -108,19 +111,35 @@ class RunRoadBaking(bpy.types.Operator):
 
         roadSides = []
         roadSidesBMesh = []
-        intersectionEntrancePoints = []
+        intersectionEntranceCenterPoints = []
+        intersectionEntranceLayerPoints = []
+        
+        roadSegments_BMesh = []
+        
+        '''
+        roadSegments = []
+        
+        for roadPair:
+            * create Curve 0
+            * convert to mesh
+            
+            for layers:         # roadSegmentLayers
+                * create Curve {index}
+                * convert to mesh
+                * merge into base mesh
+                * add side edges
+                
+                * fill with faces between Curve_{index - 1} and Curve_{index}
+        
+        merge roadSegments
+        '''
         
         for roadPair in roadPairGenerator:
+            roadSegmentLayers = []
+            roadSegmentBMesh = bmesh.new()
             '''
-            draw 0th partial curve, save to lastLayer
             for layer in range(1, len(layers):
-                layerCurve = ...
-                layerCurve.to_mesh
-                merge with 
-                save to lastLayer
             '''
-            
-            
             
             p1 = roadPair[0].metadata["Left_0"][0]
             p2 = roadPair[1].metadata["Right_0"][0]
@@ -130,16 +149,20 @@ class RunRoadBaking(bpy.types.Operator):
             layerCurveSegmentMesh = RunRoadBaking.createLayerCurveSegment(intersection.location, p1, p2, h1, h2)
             
             curve = layerCurveSegmentMesh
+            curve.vertex_groups.new(name="Curve_0")
+            curve.vertex_groups["Curve_0"].add(list(map(lambda v: v.index, curve.data.vertices)), 1.0, 'ADD')
             roadSides.append(curve)
-
+            roadSegmentLayers.append(curve)
+            roadSegmentBMesh.from_mesh(curve.data)
+            
             firstVertex = curve.data.vertices[0]
             lastVertex = curve.data.vertices[-1]
-            roadSides.append(curve)
-            
-            intersectionEntrancePoints.append((firstVertex, lastVertex))
             
             
             
+            previousCurveEndVertices = (copy.deepcopy(firstVertex.co), copy.deepcopy(lastVertex.co))
+#            intersectionEntrancePoints.append((firstVertex, lastVertex))
+
             
             
             p1 = roadPair[0].metadata["Left_1"][0]
@@ -150,53 +173,169 @@ class RunRoadBaking(bpy.types.Operator):
             layerCurveSegmentMesh = RunRoadBaking.createLayerCurveSegment(intersection.location, p1, p2, h1, h2)
             
             curve = layerCurveSegmentMesh
+            curve.vertex_groups.new(name="Curve_1")
+            curve.vertex_groups["Curve_1"].add(list(map(lambda v: v.index, curve.data.vertices)), 1.0, 'ADD')
             roadSides.append(curve)
-
+            roadSegmentLayers.append(curve)
+            roadSegmentBMesh.from_mesh(curve.data)
+            
             firstVertex = curve.data.vertices[0]
             lastVertex = curve.data.vertices[-1]
-            roadSides.append(curve)
             
-            intersectionEntrancePoints.append((firstVertex, lastVertex))
             
+            intersectionEntranceCenterPoints.append((firstVertex, lastVertex))
+
+            roadSegments_BMesh
+
+
+#            intersectionEntranceLayerPoints.append((previousCurveEndVertices[0].copy(), firstVertex.co.copy()))
+#            intersectionEntranceLayerPoints.append((lastVertex.co.copy(), previousCurveEndVertices[1].copy()))
+
+
+            p1 = previousCurveEndVertices[0]
+            p2 = firstVertex.co
+            for v in roadSegmentBMesh.verts:
+                if v.co == p1:
+                    vert1 = v
+            for v in roadSegmentBMesh.verts:
+                if v.co == p2:
+                    vert2 = v
+            roadSegmentBMesh.edges.new((vert1, vert2))
+#            roadSegments.append(roadSegmentLayers)
+
+            p1 = lastVertex.co
+            p2 = previousCurveEndVertices[1]
+            for v in roadSegmentBMesh.verts:
+                if v.co == p1:
+                    vert1 = v
+            for v in roadSegmentBMesh.verts:
+                if v.co == p2:
+                    vert2 = v
+            roadSegmentBMesh.edges.new((vert1, vert2))
+#            roadSegments.append(roadSegmentLayers)
+            
+            
+            
+#            p1 = firstVertex
+#            p2 = intersectionEntranceCenterPoints[-1][1]
+#                
+#            p1.select = True
+#            p2.select = True
+#            
+#            for v in roadSegmentBMesh.verts:
+#                if v.co == p1.co:
+#                    vert1 = v
+#            for v in roadSegmentBMesh.verts:
+#                if v.co == p2.co:
+#                    vert2 = v
+#            roadSegmentBMesh.edges.new((vert1, vert2))
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            roadSegments_BMesh.append(roadSegmentBMesh)
             
             
             
         
         intersectionBMesh = bmesh.new()
-        for curve in roadSides:
-            intersectionBMesh.from_mesh(curve.data)
         
-#        for roadSide in roadSidesBMesh:
-##            roadSideBMesh = bmesh.new()
-##            roadSideBMesh.from_mesh(roadSide)
-#            roadSide.select_set(True)
-            
-#            roadSidesBMesh.append(roadSideBMesh)
-            
-        bpy.ops.object.join()
         
-#        for index, entrance in enumerate(intersectionEntrancePoints):
-#            if index == 0:
-#                p1 = intersectionEntrancePoints[0][0]
-#                p2 = intersectionEntrancePoints[-1][1]
-#            else:
-#                p1 = intersectionEntrancePoints[index - 1][1]
-#                p2 = intersectionEntrancePoints[index][0]
-#                
-#            p1.select = True
-#            p2.select = True
+        
+#        for roadSegment in roadSegments:
+#            iter_roadSegmentLayers = iter(roadSegmentLayers)
+#            firstLayer = next(roadSegmentLayers)
 #            
+#            for layer in iter_roadSegmentLayers:
+#                
+#                intersectionBMesh.from_mesh(curve.data)
+#    #        for roadSide in roadSidesBMesh:
+#    ##            roadSideBMesh = bmesh.new()
+#    ##            roadSideBMesh.from_mesh(roadSide)
+#    #            roadSide.select_set(True)
+#                
+#    #            roadSidesBMesh.append(roadSideBMesh)
+#            bpy.ops.object.join()
+        
+        
+#        for curve in roadSides:
+#            intersectionBMesh.from_mesh(curve.data)
+#        for roadSide in roadSidesBMesh:
+###            roadSideBMesh = bmesh.new()
+###            roadSideBMesh.from_mesh(roadSide)
+#            roadSide.select_set(True)
+#            
+#            roadSidesBMesh.append(roadSideBMesh)
+#        bpy.ops.object.join()
+        
+        
+        
+        
+        
+        
+
+#        
+#        
+#        for index, pair in enumerate(intersectionEntranceLayerPoints):
+#            print("Pair index: ", index, pair)
+#            p1 = pair[0]
+#            p2 = pair[1]
 #            for v in intersectionBMesh.verts:
-#                if v.co == p1.co:
+#                if v.co == p1:
 #                    vert1 = v
 #            for v in intersectionBMesh.verts:
-#                if v.co == p2.co:
+#                if v.co == p2:
 #                    vert2 = v
-#                    
-#            intersectionBMesh.edges.new((vert1, vert2))
+#            try:
+#                intersectionBMesh.edges.new((vert1, vert2))
+#            except:
+#                print("POINT PAIR FAILED: ", pair[0], "\n", pair[1])
+        
+        intersectionBMesh = bmesh.new()
+        for roadSegmentBMesh in roadSegments_BMesh:
+            tmpMesh = bpy.data.meshes.new("tmpMesh")
+            roadSegmentBMesh.to_mesh(tmpMesh)
+            intersectionBMesh.from_mesh(tmpMesh)
+        
+        
+                
+        for index, entrance in enumerate(intersectionEntranceCenterPoints):
+            if index == 0:
+                p1 = intersectionEntranceCenterPoints[0][0]
+                p2 = intersectionEntranceCenterPoints[-1][1]
+            else:
+                p1 = intersectionEntranceCenterPoints[index - 1][1]
+                p2 = intersectionEntranceCenterPoints[index][0]
+                
+            p1.select = True
+            p2.select = True
             
+            for v in intersectionBMesh.verts:
+                if v.co == p1.co:
+                    vert1 = v
+            for v in intersectionBMesh.verts:
+                if v.co == p2.co:
+                    vert2 = v
+            intersectionBMesh.edges.new((vert1, vert2))
+        
+        
+#        intersectionMesh = bpy.data.meshes.new("intersectionMesh")
+#        intersectionBMesh.to_mesh(intersectionMesh)
+##        intersectionMesh = intersectionBMesh.to_mesh(tmpIntersectionMesh)
+#        intersectionObject = bpy.data.objects.new("ASDmergedRoadSegmentMesh", intersectionMesh)
+#        bpy.data.collections["Shaite"].objects.link(intersectionObject)
+        
+#        breakpoint()
+        
         temp_mesh = bpy.data.meshes.new(".temp")
         intersectionBMesh.to_mesh(temp_mesh)
+#        breakpoint()
         ob = bpy.data.objects.new("joined bmeshes" + str(random.randint(11, 1111)), temp_mesh)
         bpy.data.collections["Shaite"].objects.link(ob)
         
@@ -290,79 +429,27 @@ class RunRoadBaking(bpy.types.Operator):
         pairsOfClosestPoints = {}
         centerVertices = [vert for vert in road.data.vertices if road.vertex_groups['Center'].index in [i.group for i in vert.groups]]
         
-        
-#        for i in range(math.floor(len(road.vertex_groups)/2)):
-        left0Vertices  = [vert for vert in road.data.vertices if road.vertex_groups['Left_0'].index in [i.group for i in vert.groups]]
-        right0Vertices = [vert for vert in road.data.vertices if road.vertex_groups['Right_0'].index in [i.group for i in vert.groups]]
-        mappedCenterVertices = list(map(lambda vertex: road.matrix_world @ vertex.co, centerVertices))
-        mappedLeft0Vertices  = list(map(lambda vertex: road.matrix_world @ vertex.co, left0Vertices))
-        mappedRight0Vertices = list(map(lambda vertex: road.matrix_world @ vertex.co, right0Vertices))
-         
-        pairsOfClosestPoints["centerPoints"] = RunRoadBaking.closestPointPairInVertexGroup(mappedCenterVertices, intersection)
-        pairA = RunRoadBaking.closestPointPairInVertexGroup(mappedLeft0Vertices, intersection)
-        pairB = RunRoadBaking.closestPointPairInVertexGroup(mappedRight0Vertices, intersection)
-        
-        p1 = intersection.location.xy
-        p2 = pairA[0].xy
-        p3 = pairB[0].xy
-        angle = angle_between(p3 - p1, p2 - p1)
-        
-        if angle > 180: # the left side is actually more to the left
-            pairsOfClosestPoints["Left_0"]  = pairA
-            pairsOfClosestPoints["Right_0"] = pairB
-        else:
-            pairsOfClosestPoints["Left_0"]  = pairB
-            pairsOfClosestPoints["Right_0"] = pairA
-        
-        
-        
-        
-        
-        left1Vertices  = [vert for vert in road.data.vertices if road.vertex_groups['Left_1'].index in [i.group for i in vert.groups]]
-        right1Vertices = [vert for vert in road.data.vertices if road.vertex_groups['Right_1'].index in [i.group for i in vert.groups]]
-        mappedLeft1Vertices  = list(map(lambda vertex: road.matrix_world @ vertex.co, left1Vertices))
-        mappedRight1Vertices = list(map(lambda vertex: road.matrix_world @ vertex.co, right1Vertices))
-        
-        pairA = RunRoadBaking.closestPointPairInVertexGroup(mappedLeft1Vertices, intersection)
-        pairB = RunRoadBaking.closestPointPairInVertexGroup(mappedRight1Vertices, intersection)
-        
-        p1 = intersection.location.xy
-        p2 = pairA[0].xy
-        p3 = pairB[0].xy
-        angle = angle_between(p3 - p1, p2 - p1)
-        
-        if angle > 180: # the left side is actually more to the left
-            pairsOfClosestPoints["Left_1"]  = pairA
-            pairsOfClosestPoints["Right_1"] = pairB
-        else:
-            pairsOfClosestPoints["Left_1"]  = pairB
-            pairsOfClosestPoints["Right_1"] = pairA
-        
-        
-        
-        
-        
-        
-        
-#        p1 = intersection.location.xy
-#        p2 = mathutils.Vector((intersection.location.x + 20, intersection.location.y))
-#        p3a = pairA[0].xy
-#        angleA = angle_between(p3a - p1, p2 - p1)
-#        p3b = pairB[0].xy
-#        angleB = angle_between(p3b - p1, p2 - p1)
-#        
-#        if angleA < angleB: # the left side is actually more to the left
-#            pairsOfClosestPoints["Left_0"]  = pairA
-#            pairsOfClosestPoints["Right_0"] = pairB
-#        else:
-#            pairsOfClosestPoints["Left_0"]  = pairB
-#            pairsOfClosestPoints["Right_0"] = pairA
-        
-        
-        
-        
-#        breakpoint()
-#        RunRoadBaking.drawLine(p1, p2)
+        for i in range(math.floor(len(road.vertex_groups)/2)): # for every layer:
+            leftVertices  = [vert for vert in road.data.vertices if road.vertex_groups["Left_" + str(i)].index in [i.group for i in vert.groups]]
+            rightVertices = [vert for vert in road.data.vertices if road.vertex_groups["Right_" + str(i)].index in [i.group for i in vert.groups]]
+            mappedCenterVertices = list(map(lambda vertex: road.matrix_world @ vertex.co, centerVertices))
+            mappedLeftVertices  = list(map(lambda vertex: road.matrix_world @ vertex.co, leftVertices))
+            mappedRightVertices = list(map(lambda vertex: road.matrix_world @ vertex.co, rightVertices))
+             
+            pairsOfClosestPoints["Center"] = RunRoadBaking.closestPointPairInVertexGroup(mappedCenterVertices, intersection)
+            pairA = RunRoadBaking.closestPointPairInVertexGroup(mappedLeftVertices, intersection)
+            pairB = RunRoadBaking.closestPointPairInVertexGroup(mappedRightVertices, intersection)
+            
+            p1 = intersection.location.xy
+            p2 = pairA[0].xy
+            p3 = pairB[0].xy
+            angle = angle_between(p3 - p1, p2 - p1)
+            if angle > 180: # the left side is actually more to the left
+                pairsOfClosestPoints["Left_" + str(i)]  = pairA
+                pairsOfClosestPoints["Right_" + str(i)] = pairB
+            else:
+                pairsOfClosestPoints["Left_" + str(i)]  = pairB
+                pairsOfClosestPoints["Right_" + str(i)] = pairA
         
         return pairsOfClosestPoints
 
@@ -385,7 +472,7 @@ class RunRoadBaking(bpy.types.Operator):
         p1 = intersection.location.xy
         p2 = mathutils.Vector((intersection.location.x, intersection.location.y + 20))
         for road in roads:
-            p3 = road.metadata["centerPoints"][0].xy
+            p3 = road.metadata["Center"][0].xy
             angle = angle_between(p3 - p1, p2 - p1) # angle = numpy.arccos((math.dist(p1, p2)**2 + math.dist(p1, p3)**2 - math.dist(p2, p3)**2) / (2 * math.dist(p1, p2) * math.dist(p1, p3)))
             roadsOrderedByAngles.append((road, angle))
         roadsOrderedByAngles.sort(key = lambda road: road[1])
@@ -433,6 +520,14 @@ class RunRoadBaking(bpy.types.Operator):
     def cleanUpCreatedRoads():
         bpy.ops.object.select_all(action='DESELECT')
         for o in bpy.data.collections["Roads"].objects:
+            o.select_set(True)
+            
+        bpy.ops.object.delete(use_global=False, confirm=False)
+    
+    @staticmethod
+    def cleanUpCreatedShaite():
+        bpy.ops.object.select_all(action='DESELECT')
+        for o in bpy.data.collections["Shaite"].objects:
             o.select_set(True)
             
         bpy.ops.object.delete(use_global=False, confirm=False)
