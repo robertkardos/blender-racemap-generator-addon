@@ -672,32 +672,39 @@ class RunRoadBaking(bpy.types.Operator):
         # select all side edges
         bpy.ops.mesh.select_all( action = 'DESELECT' )
         
-        cGroup = bpy.context.object.vertex_groups['Curve_0']
-        lGroup = bpy.context.object.vertex_groups['Left_0']
-        rGroup = bpy.context.object.vertex_groups['Right_0']
-        bpy.context.object.vertex_groups.active = cGroup
+        ROADOBJ = bpy.context.object
+        
+        cGroup = ROADOBJ.vertex_groups['Curve_0']
+        lGroup = ROADOBJ.vertex_groups['Left_0']
+        rGroup = ROADOBJ.vertex_groups['Right_0']
+        ROADOBJ.vertex_groups.active = cGroup
         bpy.ops.object.vertex_group_select()
-        bpy.context.object.vertex_groups.active = lGroup
+        ROADOBJ.vertex_groups.active = lGroup
         bpy.ops.object.vertex_group_select()
-        bpy.context.object.vertex_groups.active = rGroup
+        ROADOBJ.vertex_groups.active = rGroup
         bpy.ops.object.vertex_group_select()
         
         bpy.ops.object.mode_set(mode = 'OBJECT')
         
-        selected_verts = [v for v in bpy.context.object.data.vertices if v.select]
-        bpy.context.object.vertex_groups.new(name='Edge')
-        bpy.context.object.vertex_groups['Edge'].add(list(map(lambda v: v.index, selected_verts)), 1.0, 'ADD')
+        selected_verts = [v for v in ROADOBJ.data.vertices if v.select]
+        ROADOBJ.vertex_groups.new(name='Edge')
+        ROADOBJ.vertex_groups['Edge'].add(list(map(lambda v: v.index, selected_verts)), 1.0, 'ADD')
         
         
-        for i in range(3):
+#        for i in range(2):
+        i = 0
+        while (len(selected_verts) > 0):
+        
+            print('SELECTED verts: ', len(selected_verts))
+            
             bpy.ops.object.mode_set(mode = 'EDIT')
             bpy.ops.mesh.select_all(action = 'DESELECT')
             bpy.ops.object.mode_set(mode = 'OBJECT')
             print('SELECTION: ', i)
             # SELECT A VERTEX FROM VERTEX_GROUP['Edge']
-            indexOfEdgeVertexGroup = bpy.context.object.vertex_groups['Edge'].index
+            indexOfEdgeVertexGroup = ROADOBJ.vertex_groups['Edge'].index
             vertexPairOnEdge = []
-            for v in bpy.context.object.data.vertices:
+            for v in ROADOBJ.data.vertices:
     #            if len(v.groups) > 0:
                 for group in v.groups:
                     if group.group == indexOfEdgeVertexGroup:
@@ -708,6 +715,7 @@ class RunRoadBaking(bpy.types.Operator):
                     print('Found EDGE')
                     break
             
+            print('vertexPairOnEdge: ', len(vertexPairOnEdge))
             vertexPairOnEdge[0].select = True
             vertexPairOnEdge[1].select = True
             bpy.ops.object.mode_set(mode = 'EDIT')
@@ -715,11 +723,11 @@ class RunRoadBaking(bpy.types.Operator):
             bpy.ops.mesh.loop_multi_select(ring=False)
             bpy.ops.mesh.select_mode(use_extend=False, use_expand=False, type='VERT')
             bpy.ops.object.mode_set(mode = 'OBJECT')
-            selected_verts = [v for v in bpy.context.object.data.vertices if v.select]
-            selected_edges = [e for e in bpy.context.object.data.edges if e.select]
+            selected_verts = [v for v in ROADOBJ.data.vertices if v.select]
+            selected_edges = [e for e in ROADOBJ.data.edges if e.select]
             
             bm = bmesh.new()
-            bm.from_mesh(bpy.context.object.data)
+            bm.from_mesh(ROADOBJ.data)
             new_mesh = bmesh.new()
             onm = {} # old index to new vert map
             
@@ -739,26 +747,109 @@ class RunRoadBaking(bpy.types.Operator):
 #            selected_verts = [v for v in new_mesh.vertices if v.select]
 #            selected_edges = [e for e in new_mesh.edges if e.select]
             
-            bpy.context.object.vertex_groups['Edge'].remove(list(map(lambda v: v.index, selected_verts)))
+            ROADOBJ.vertex_groups['Edge'].remove(list(map(lambda v: v.index, selected_verts)))
         
 #            print('Selected vertices: ', len(selected_verts))
-            if i != 0: # not the outer loop
+            if i != 2: # not the outer loop
 #                RunRoadBaking.triangulize(selected_verts, selected_edges)
                 triangulizedSurface = RunRoadBaking.triangulize(new_mesh)
                 triangulizedSurface.location = location
                 bpy.data.collections["Terrain"].objects.link(triangulizedSurface)
+            else:
+                print('OUTER GENERATE')
+                corners = [[-250, -250], [250, -250], [250, 250], [-250, 250]]
+                
+                hole = [110, 110]
+                
+                borderBM = bmesh.new()
+
+                for corner in corners:
+                    borderBM.verts.new((corner[0], corner[1], 0))
+                borderBM.verts.ensure_lookup_table()
+                borderBM.edges.new((borderBM.verts[0], borderBM.verts[1]))
+                borderBM.edges.new((borderBM.verts[1], borderBM.verts[2]))
+                borderBM.edges.new((borderBM.verts[2], borderBM.verts[3]))
+                borderBM.edges.new((borderBM.verts[3], borderBM.verts[0]))
+                
+                borderBM.verts.index_update()
+                
+                tmpMesh = bpy.data.meshes.new("tmpMesh")
+                borderBM.to_mesh(tmpMesh)
+                new_mesh.from_mesh(tmpMesh)
+                
+                triangulizedSurface = RunRoadBaking.triangulizeAround(new_mesh, corners, hole)
+                triangulizedSurface.location = location
+                bpy.data.collections["Terrain"].objects.link(triangulizedSurface)
+    
+            i += 1
+            
+            selected_verts = [v for v in ROADOBJ.data.vertices if indexOfEdgeVertexGroup in [i.group for i in v.groups]]
+            print('NEXT round SELECTED verts: ', len(selected_verts))
+    
+    
+    @staticmethod
+#    def triangulize(vertices, edges):
+    def triangulizeAround(terrainBM, corners, hole):
+        terrainBM.verts.index_update()
+        mappedVerts = list(map(lambda v: list(v.co.xy), list(terrainBM.verts)))
+        v = mappedVerts
+        numOfBoundaryVertices = len(mappedVerts)
+        s = list(map(lambda e: [e.verts[0].index, e.verts[1].index], list(terrainBM.edges)))
+
+        t = triangulate({'vertices': v, 'holes': [hole], 'segments': s}, 'qpa14.1')
+        newVertices = t['vertices'].tolist()
+        for i in range(len(mappedVerts), len(newVertices)):
+#            print('B index: ', i)
+            newVert = newVertices[i]
+            newVert.append(0)
+        #    breakpoint()
+            newVertTuple = tuple(newVert)
+            terrainBM.verts.new(newVertTuple)
+
+        terrainBM.verts.ensure_lookup_table()
+        
+        for triangle in t['triangles'].tolist():
+            
+            try:
+                terrainBM.edges.new((terrainBM.verts[triangle[0]], terrainBM.verts[triangle[1]]))
+            except ValueError:
+                pass
+            try:
+                terrainBM.edges.new((terrainBM.verts[triangle[1]], terrainBM.verts[triangle[2]]))
+            except ValueError:
+                pass
+            try:
+                terrainBM.edges.new((terrainBM.verts[triangle[2]], terrainBM.verts[triangle[0]]))
+            except ValueError:
+                pass
+
+        tmpMesh = bpy.data.meshes.new("tmpMesh")
+        terrainBM.to_mesh(tmpMesh)
+        tmpObject = bpy.data.objects.new("ASDmergedRoadSegmentMesh", tmpMesh)
+        
+#        for i in range(numOfBoundaryVertices):
+#            tmpObject.data.vertices[i]
+        tmpObject.vertex_groups.new(name="Roadside")
+        tmpObject.vertex_groups["Roadside"].add(list(range(numOfBoundaryVertices)), 1.0, 'ADD')
+        tmpObject.vertex_groups.new(name="Terrain")
+        tmpObject.vertex_groups["Terrain"].add(list(range(numOfBoundaryVertices, len(tmpObject.data.vertices))), 1.0, 'ADD')
+        
+        return tmpObject
+    
+    
     
     @staticmethod
 #    def triangulize(vertices, edges):
     def triangulize(terrainBM):
         mappedVerts = list(map(lambda v: list(v.co.xy), list(terrainBM.verts)))
+        numOfBoundaryVertices = len(mappedVerts)
         v = mappedVerts
         s = list(map(lambda e: [e.verts[0].index, e.verts[1].index], list(terrainBM.edges)))
 #        s = list(map(lambda e: [e.vertices[0], e.vertices[1]], list(terrainBM.edges)))
-        t = triangulate({'vertices': v, 'holes': [[11111, 11111]], 'segments': s}, 'qpa0.1')
+        t = triangulate({'vertices': v, 'holes': [[11111, 11111]], 'segments': s}, 'qpa14.1')
         newVertices = t['vertices'].tolist()
         for i in range(len(mappedVerts), len(newVertices)):
-            print('B index: ', i)
+#            print('B index: ', i)
             newVert = newVertices[i]
             newVert.append(0)
         #    breakpoint()
@@ -772,21 +863,31 @@ class RunRoadBaking(bpy.types.Operator):
             try:
                 terrainBM.edges.new((terrainBM.verts[triangle[0]], terrainBM.verts[triangle[1]]))
             except ValueError:
-                print('reduntant edge')
+                pass
+#                print('reduntant edge')
             try:
                 terrainBM.edges.new((terrainBM.verts[triangle[1]], terrainBM.verts[triangle[2]]))
             except ValueError:
-                print('reduntant edge')
+                pass
+#                print('reduntant edge')
             try:
                 terrainBM.edges.new((terrainBM.verts[triangle[2]], terrainBM.verts[triangle[0]]))
             except ValueError:
-                print('reduntant edge')
+                pass
+#                print('reduntant edge')
 
         tmpMesh = bpy.data.meshes.new("tmpMesh")
         terrainBM.to_mesh(tmpMesh)
         tmpObject = bpy.data.objects.new("ASDmergedRoadSegmentMesh", tmpMesh)
+        
+#        for i in range(numOfBoundaryVertices):
+#            tmpObject.data.vertices[i]
+        tmpObject.vertex_groups.new(name="Roadside")
+        tmpObject.vertex_groups["Roadside"].add(list(range(numOfBoundaryVertices)), 1.0, 'ADD')
+        tmpObject.vertex_groups.new(name="Terrain")
+        tmpObject.vertex_groups["Terrain"].add(list(range(numOfBoundaryVertices, len(tmpObject.data.vertices))), 1.0, 'ADD')
+        
         return tmpObject
-    
     
     @staticmethod
     def connectRoadsInIntersectionBAK(roads, intersectionLocation):
