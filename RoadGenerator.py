@@ -56,7 +56,7 @@ class RunRoadBaking(bpy.types.Operator):
     bl_idname = "wm.hello_world"
     bl_label = "Minimal Operator"
     roadSegment: bpy.types.Object
-
+    
     def execute(self, context):
         print("BAKING ROADS...")
         RunRoadBaking.cleanUpCreatedRoads()
@@ -70,7 +70,7 @@ class RunRoadBaking(bpy.types.Operator):
             RunRoadBaking.setUpRoadModifiersAndConstraint(self, curve)
         
         bpy.ops.object.select_all(action='DESELECT')
-                
+        
         for intersection in bpy.data.collections["Intersections"].objects:
             intersection.select_set(True)
             bpy.context.view_layer.objects.active = intersection
@@ -102,11 +102,98 @@ class RunRoadBaking(bpy.types.Operator):
                 roadsWithMetadata = RunRoadBaking.pairRoadsToTheirIntersectionPoints(roadsCloseToIntersection, intersection)
                 orderedRoads = RunRoadBaking.orderRoadsAroundIntersectionCCW(roadsWithMetadata, intersection)
                 RunRoadBaking.connectRoadsInIntersection(orderedRoads, intersection)
-
-        RunRoadBaking.joinRoadsAndIntersections()
+        
+        roadNetwork = RunRoadBaking.joinRoadsAndIntersections()
+        terrainFragments = RunRoadBaking.createTerrainFragments(roadNetwork)
+        
+        roadNetwork.select_set(False)
+#        bpy.context.view_layer.objects.active = roadNetwork
+        
+        
+        
+        
+#        for terrainFragment in terrainFragments:
+#            terrainFragment.select = True
+##            bpy.context.view_layer.objects.active = terrainFragment
+#            bpy.ops.object.join()
+##            bpy.data.collections["Terrain"].objects.link(terrainFragment)
+##        temp_mesh = bpy.data.meshes.new(".temp")
+##        mergedBM.to_mesh(temp_mesh)
+##        mergerObject = bpy.data.objects.new("FINALTERRAIN" + str(random.randint(11, 1111)), temp_mesh)
+##        mergerObject.location = roadNetwork.location
+#        RunRoadBaking.shrinkwrapTerrain(roadNetwork)
+#        bpy.data.collections["Shaite"].objects.link(roadNetwork)
+        
+        
+#        mergedBM = bmesh.new()
+#        mergedBM.from_mesh(roadNetwork.data)
+#        for terrainFragment in terrainFragments:
+#            bpy.data.collections["Terrain"].objects.link(terrainFragment)
+#            RunRoadBaking.shrinkwrapTerrain(terrainFragment)
+#            mergedBM.from_mesh(terrainFragment.data)
+#        temp_mesh = bpy.data.meshes.new(".temp")
+#        mergedBM.to_mesh(temp_mesh)
+#        mergerObject = bpy.data.objects.new("FINALTERRAIN" + str(random.randint(11, 1111)), temp_mesh)
+#        mergerObject.location = roadNetwork.location
+#        bpy.data.collections["Shaite"].objects.link(mergerObject)
+        
+        print('Terrain fragments: ', len(terrainFragments))
+        for terrainFragment in terrainFragments:
+            bpy.data.collections['Terrain'].objects.link(terrainFragment)
+            RunRoadBaking.shrinkwrapTerrain(terrainFragment)
+            terrainFragment.select_set(True)
+            bpy.ops.object.mode_set(mode='EDIT')
+            bpy.ops.mesh.select_all(action='SELECT')
+#            bpy.ops.mesh.fill()
+            bpy.ops.mesh.edge_face_add()
+            bpy.ops.mesh.select_all(action='DESELECT')
+            bpy.ops.object.mode_set(mode='OBJECT')
+            bpy.ops.object.select_all(action='DESELECT')
+            terrainFragment.select_set(False)
+#            terrainFragment.select_set(True)
+        
+        for obj in bpy.data.collections['Terrain'].all_objects:
+            obj.select_set(True)
+        for obj in bpy.data.collections['Shaite'].all_objects:
+            obj.select_set(True)
+        
+        bpy.ops.object.join()
+        bpy.ops.object.mode_set(mode='EDIT')
+        bpy.ops.mesh.select_mode(type="VERT")
+        bpy.ops.mesh.select_all(action = 'SELECT')
+        bpy.ops.mesh.remove_doubles()
+        bpy.ops.object.mode_set(mode='OBJECT')
         
         print("ROAD BAKING DONE")
         return {'FINISHED'}
+    
+    
+    @staticmethod
+    def shrinkwrapTerrain(terrain):
+        terrain.select_set(True, view_layer=bpy.context.view_layer)
+        bpy.context.view_layer.objects.active = terrain
+        bpy.ops.object.modifier_add(type='SHRINKWRAP')
+        terrain.modifiers['Shrinkwrap'].target = bpy.data.objects['Landscape']
+        terrain.modifiers["Shrinkwrap"].vertex_group = "Terrain"
+        terrain.modifiers["Shrinkwrap"].wrap_method = 'PROJECT'
+        terrain.modifiers["Shrinkwrap"].use_project_z = True
+        terrain.modifiers["Shrinkwrap"].use_negative_direction = True
+        terrain.modifiers["Shrinkwrap"].use_positive_direction = True
+
+        bpy.ops.object.modifier_apply(apply_as='DATA', modifier='Shrinkwrap')
+
+#        self.roadSegment.modifiers['Array'].curve = curve
+#        self.roadSegment.modifiers['Array'].use_merge_vertices = True
+
+#        bpy.ops.object.modifier_add(type='CURVE')
+#        self.roadSegment.modifiers['Curve'].object = curve
+#        bpy.ops.object.constraint_add(type='COPY_LOCATION')
+#        
+#        self.roadSegment.constraints["Copy Location"].target = curve
+
+#        bpy.ops.object.modifier_apply(apply_as='DATA', modifier='Array')
+#        bpy.ops.object.modifier_apply(apply_as='DATA', modifier='Curve')
+    
     
     @staticmethod
     def connectRoadsInIntersection(roads, intersection): # fuck this specifically
@@ -367,7 +454,7 @@ class RunRoadBaking(bpy.types.Operator):
             
             mergerObject = bpy.context.object
         
-#        bpy.data.collections["Shaite"].objects.link(mergerObject)
+#        bpy.data.collections["Shaite"].objectsROADOBJ(mergerObject)
         
 
 
@@ -639,14 +726,23 @@ class RunRoadBaking(bpy.types.Operator):
         
         bpy.ops.object.join()
         
-        location = bpy.context.object.location
+        return bpy.context.object
+    
+    
+    @staticmethod
+    def createTerrainFragments(roadNetworkObj):
+        terrainFragments = []
+        
+        ROADOBJ = roadNetworkObj
+        
+        location = ROADOBJ.location
         bpy.ops.object.mode_set(mode = 'EDIT')
         bpy.ops.mesh.select_all(action='SELECT')
         bpy.ops.mesh.remove_doubles()
         
         # select all side edges
         bpy.ops.mesh.select_all( action = 'DESELECT' )
-        ROADOBJ = bpy.context.object
+        
         cGroup = ROADOBJ.vertex_groups['Curve_0']
         lGroup = ROADOBJ.vertex_groups['Left_0']
         rGroup = ROADOBJ.vertex_groups['Right_0']
@@ -715,7 +811,7 @@ class RunRoadBaking(bpy.types.Operator):
             
             if i == 0: # the outer loop
                 print('OUTER GENERATE')
-                corners = [[-250, -250], [250, -250], [250, 250], [-250, 250]]
+                corners = [[-120, -110], [200, -110], [220, 220], [-120, 220]]
                 hole = [110, 110]
                 
                 borderBM = bmesh.new()
@@ -736,30 +832,30 @@ class RunRoadBaking(bpy.types.Operator):
                 
                 triangulizedSurface = RunRoadBaking.triangulizeAround(new_mesh, corners, hole)
                 triangulizedSurface.location = location
-                bpy.data.collections["Terrain"].objects.link(triangulizedSurface)
+                terrainFragments.append(triangulizedSurface)
             else:
 #                RunRoadBaking.triangulize(selected_verts, selected_edges)
                 triangulizedSurface = RunRoadBaking.triangulize(new_mesh)
                 triangulizedSurface.location = location
-                bpy.data.collections["Terrain"].objects.link(triangulizedSurface)
-                
-    
+                terrainFragments.append(triangulizedSurface)
+            
             i += 1
             
             selected_verts = [v for v in ROADOBJ.data.vertices if indexOfEdgeVertexGroup in [i.group for i in v.groups]]
             print('NEXT round SELECTED verts: ', len(selected_verts))
     
+        return terrainFragments
+    
     
     @staticmethod
-#    def triangulize(vertices, edges):
     def triangulizeAround(terrainBM, corners, hole):
         terrainBM.verts.index_update()
         mappedVerts = list(map(lambda v: list(v.co.xy), list(terrainBM.verts)))
         v = mappedVerts
-        numOfBoundaryVertices = len(mappedVerts)
+        numOfBoundaryVertices = len(mappedVerts) - 4
         s = list(map(lambda e: [e.verts[0].index, e.verts[1].index], list(terrainBM.edges)))
 
-        t = triangulate({'vertices': v, 'holes': [hole], 'segments': s}, 'qpa14.1')
+        t = triangulate({'vertices': v, 'holes': [hole], 'segments': s}, 'qpa4.1')
         newVertices = t['vertices'].tolist()
         for i in range(len(mappedVerts), len(newVertices)):
             newVert = newVertices[i]
@@ -785,11 +881,13 @@ class RunRoadBaking(bpy.types.Operator):
 
         tmpMesh = bpy.data.meshes.new("tmpMesh")
         terrainBM.to_mesh(tmpMesh)
-        tmpObject = bpy.data.objects.new("ASDmergedRoadSegmentMesh", tmpMesh)
+        tmpObject = bpy.data.objects.new("TerrainFragment", tmpMesh)
         
         tmpObject.vertex_groups.new(name="Roadside")
-        tmpObject.vertex_groups["Roadside"].add(list(range(numOfBoundaryVertices)), 1.0, 'ADD')
+        tmpObject.vertex_groups["Roadside"].add(list(range(3, numOfBoundaryVertices)), 1.0, 'ADD')
         tmpObject.vertex_groups.new(name="Terrain")
+        
+        tmpObject.vertex_groups["Terrain"].add(list(range(4)), 1.0, 'ADD')
         tmpObject.vertex_groups["Terrain"].add(list(range(numOfBoundaryVertices, len(tmpObject.data.vertices))), 1.0, 'ADD')
         
         return tmpObject
@@ -803,7 +901,7 @@ class RunRoadBaking(bpy.types.Operator):
         v = mappedVerts
         s = list(map(lambda e: [e.verts[0].index, e.verts[1].index], list(terrainBM.edges)))
 #        s = list(map(lambda e: [e.vertices[0], e.vertices[1]], list(terrainBM.edges)))
-        t = triangulate({'vertices': v, 'holes': [[11111, 11111]], 'segments': s}, 'qpa14.1')
+        t = triangulate({'vertices': v, 'holes': [[11111, 11111]], 'segments': s}, 'qpa4.1')
         newVertices = t['vertices'].tolist()
         for i in range(len(mappedVerts), len(newVertices)):
             newVert = newVertices[i]
@@ -829,7 +927,7 @@ class RunRoadBaking(bpy.types.Operator):
 
         tmpMesh = bpy.data.meshes.new("tmpMesh")
         terrainBM.to_mesh(tmpMesh)
-        tmpObject = bpy.data.objects.new("ASDmergedRoadSegmentMesh", tmpMesh)
+        tmpObject = bpy.data.objects.new("TerrainFragment", tmpMesh)
         
         tmpObject.vertex_groups.new(name="Roadside")
         tmpObject.vertex_groups["Roadside"].add(list(range(numOfBoundaryVertices)), 1.0, 'ADD')
