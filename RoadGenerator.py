@@ -5,6 +5,17 @@ import random
 import copy
 from triangle import *
 
+from bpy.props import (StringProperty, PointerProperty)
+from bpy.types import (Panel, PropertyGroup)
+
+class MySettings(bpy.types.PropertyGroup):
+    landscape : StringProperty(
+        name="Base terrain",
+        description=":",
+        default="Landscape",
+        maxlen=1024
+    )
+
 def createCircularIterator(roads):
     iterRoads = iter(roads)
     returnRoads = [next(iterRoads)]
@@ -20,7 +31,7 @@ def createCircularIterator(roads):
 def tupleCircularShift(tuple):
     for (a0,a1),(b0,b1) in zip(tuple[1:], tuple):
         yield(a0,b1)
-    yield (tuple[0][0], tuple[-1][1])
+    yield(tuple[0][0], tuple[-1][1])
 
 def angle_between(v1, v2):
     p1 = (v1.x, v1.y)
@@ -36,26 +47,31 @@ class RoadElement():
     def __init__(self, object, metadata):
         self.object = object
         self.metadata = metadata
-            
+
+
 class HelloWorldPanel(bpy.types.Panel):
     """Creates a Panel in the Object properties window"""
-    bl_label = "Hello World Panel"
+    bl_label = "Race map generator"
     bl_idname = "OBJECT_PT_helloasdasd"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     def draw(self, context):
         layout = self.layout
         obj = context.object
+        myPropertiesasd = context.scene.myPropertiesasd
+#        row = layout.row()
+#        worth_group_tools = context.scene.worth_group_tools
+#        print(worth_group_tools)
+#        row.prop(worth_group_tools, "name")
         row = layout.row()
-        row.label(text="Hello world!", icon='WORLD_DATA')
-        row = layout.row()
-        row.label(text="Active object is: " + obj.name)
-        row = layout.row()
-        row.prop(obj, "name")
+        row.prop(myPropertiesasd, "landscape")
+        
+        
         row = layout.row()
         row.operator("mesh.primitive_uv_sphere_add", text="Add intersection")
         row = layout.row()
         row.operator("wm.hello_world", text="Run road baking")
+
 
 class RunRoadBaking(bpy.types.Operator):
     bl_idname = "wm.hello_world"
@@ -137,6 +153,21 @@ class RunRoadBaking(bpy.types.Operator):
         bpy.ops.mesh.remove_doubles()
         bpy.ops.object.mode_set(mode='OBJECT')
         
+        
+        roadsAndTerrain = bpy.context.object
+        
+        roadsAndTerrain.select_set(True)
+        bpy.ops.object.mode_set(mode='EDIT')
+        bpy.ops.mesh.select_all(action='DESELECT')
+#        bpy.ops.object.mode_set(mode='OBJECT')
+        terrainGroup = roadsAndTerrain.vertex_groups["Terrain"]
+        roadsAndTerrain.vertex_groups.active = terrainGroup
+        bpy.ops.object.vertex_group_select()
+#        roadsAndTerrain.active_material_index = roadsAndTerrain.material_slots.keys().index('Grass')
+        bpy.ops.object.material_slot_add()
+        bpy.context.object.active_material = bpy.data.materials['Grass']
+        bpy.ops.object.material_slot_assign()
+
         print("-------- DONE --------")
         return {'FINISHED'}
     
@@ -251,7 +282,7 @@ class RunRoadBaking(bpy.types.Operator):
             bpy.context.object.data.edges[edgeIndex].vertices[0] = vert1
             bpy.context.object.data.edges[edgeIndex].vertices[1] = vert2
         intersectionObj = bpy.context.object
-        
+        # / CONNECT INNERMOST POINTS ALONG ROADS
         
         # FILL INSIDE OF INTERSECTION
         bpy.ops.object.mode_set(mode = 'EDIT')
@@ -566,7 +597,7 @@ class RunRoadBaking(bpy.types.Operator):
         v = mappedVerts
         numOfBoundaryVertices = len(mappedVerts) - 4
         s = list(map(lambda e: [e.verts[0].index, e.verts[1].index], list(terrainBM.edges)))
-        t = triangulate({'vertices': v, 'holes': [hole], 'segments': s}, 'qpa4.1')
+        t = triangulate({'vertices': v, 'holes': [hole], 'segments': s}, 'qpa14.1')
         newVertices = t['vertices'].tolist()
         for i in range(len(mappedVerts), len(newVertices)):
             newVert = newVertices[i]
@@ -612,7 +643,7 @@ class RunRoadBaking(bpy.types.Operator):
         v = mappedVerts
         s = list(map(lambda e: [e.verts[0].index, e.verts[1].index], list(terrainBM.edges)))
 #        s = list(map(lambda e: [e.vertices[0], e.vertices[1]], list(terrainBM.edges)))
-        t = triangulate({'vertices': v, 'holes': [[11111, 11111]], 'segments': s}, 'qpa4.1')
+        t = triangulate({'vertices': v, 'holes': [[11111, 11111]], 'segments': s}, 'qpa14.1')
         newVertices = t['vertices'].tolist()
         for i in range(len(mappedVerts), len(newVertices)):
             newVert = newVertices[i]
@@ -646,15 +677,22 @@ class RunRoadBaking(bpy.types.Operator):
         tmpObject.vertex_groups["Terrain"].add(list(range(numOfBoundaryVertices, len(tmpObject.data.vertices))), 1.0, 'ADD')
         
         return tmpObject
+    
+
 
 
 def register():
     bpy.utils.register_class(HelloWorldPanel)
     bpy.utils.register_class(RunRoadBaking)
+    bpy.utils.register_class(MySettings)
+    
+    bpy.types.Scene.myPropertiesasd = bpy.props.PointerProperty(type=MySettings)
 
 def unregister():
     bpy.utils.unregister_class(HelloWorldPanel)
     bpy.utils.unregister_class(RunRoadBaking)
+    bpy.utils.unregister_class(MySettings)
+    del bpy.types.Scene.myPropertiesasd
 
 if __name__ == "__main__":
     register()
