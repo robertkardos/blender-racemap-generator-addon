@@ -8,6 +8,8 @@ from triangle import *
 from bpy.props import (StringProperty, PointerProperty)
 from bpy.types import (Panel, PropertyGroup)
 
+finalCollection = "Terrain"
+
 class MySettings(bpy.types.PropertyGroup):
     landscape : StringProperty(
         name="Base terrain",
@@ -71,6 +73,8 @@ class HelloWorldPanel(bpy.types.Panel):
         row.operator("mesh.primitive_uv_sphere_add", text="Add intersection")
         row = layout.row()
         row.operator("wm.hello_world", text="Run road baking")
+        row = layout.row()
+        row.operator("wm.export_prep", text="Pre-export")
 
 
 class RunRoadBaking(bpy.types.Operator):
@@ -123,7 +127,6 @@ class RunRoadBaking(bpy.types.Operator):
         
         roadNetwork = RunRoadBaking.joinRoadsAndIntersections()
         terrainFragments = RunRoadBaking.createTerrainFragments(roadNetwork)
-        
         roadNetwork.select_set(False)
         
         print('Terrain fragments: ', len(terrainFragments))
@@ -140,6 +143,7 @@ class RunRoadBaking(bpy.types.Operator):
             bpy.ops.object.select_all(action='DESELECT')
             terrainFragment.select_set(False)
 #            terrainFragment.select_set(True)
+        
         
         for obj in bpy.data.collections['Terrain'].all_objects:
             obj.select_set(True)
@@ -167,6 +171,12 @@ class RunRoadBaking(bpy.types.Operator):
         bpy.ops.object.material_slot_add()
         bpy.context.object.active_material = bpy.data.materials['Grass']
         bpy.ops.object.material_slot_assign()
+
+        bpy.ops.mesh.select_all(action='DESELECT')
+        bpy.ops.object.mode_set(mode='OBJECT')
+
+        roadsAndTerrain.name = "Map"
+#        roadsAndTerrain.collections.link
 
         print("-------- DONE --------")
         return {'FINISHED'}
@@ -353,7 +363,6 @@ class RunRoadBaking(bpy.types.Operator):
         pairsOfClosestPoints = {}
         centerVertices = [vert for vert in road.data.vertices if road.vertex_groups['Center'].index in [i.group for i in vert.groups]]
         
-        print("ROAD: ", road)
         for i in range(math.floor(len(road.vertex_groups)/2)): # for every layer:
             leftVertices  = [vert for vert in road.data.vertices if road.vertex_groups["Left_" + str(i)].index in [i.group for i in vert.groups]]
             rightVertices = [vert for vert in road.data.vertices if road.vertex_groups["Right_" + str(i)].index in [i.group for i in vert.groups]]
@@ -371,12 +380,9 @@ class RunRoadBaking(bpy.types.Operator):
             angle = angle_between(p3 - p1, p2 - p1)
 #            breakpoint()
             if angle > 180: # the left side is actually more to the left
-                print("    LEFT at  ", angle)
                 pairsOfClosestPoints["Left_" + str(i)]  = pairA
                 pairsOfClosestPoints["Right_" + str(i)] = pairB
-                print(pairA)
             else:
-                print("    RIGHT at ", angle)
                 pairsOfClosestPoints["Left_" + str(i)]  = pairB
                 pairsOfClosestPoints["Right_" + str(i)] = pairA
         
@@ -473,6 +479,10 @@ class RunRoadBaking(bpy.types.Operator):
             obj.select_set(True)
         
         bpy.ops.object.join()
+        bpy.ops.object.mode_set(mode = 'EDIT')
+        bpy.ops.mesh.select_all(action='SELECT')
+        bpy.ops.mesh.remove_doubles()
+        bpy.ops.object.mode_set(mode = 'OBJECT')
         
         return bpy.context.object
     
@@ -514,6 +524,7 @@ class RunRoadBaking(bpy.types.Operator):
             bpy.ops.mesh.select_all(action = 'DESELECT')
             bpy.ops.object.mode_set(mode = 'OBJECT')
             print('SELECTION: ', i)
+            
             # SELECT A VERTEX FROM VERTEX_GROUP['Edge']
             indexOfEdgeVertexGroup = ROADOBJ.vertex_groups['Edge'].index
             vertexPairOnEdge = []
@@ -554,9 +565,12 @@ class RunRoadBaking(bpy.types.Operator):
             ROADOBJ.vertex_groups['Edge'].remove(list(map(lambda v: v.index, selected_verts)))
             
             if i == 0: # the outer loop
-                corners = [[-120, -110], [200, -110], [220, 220], [-120, 220]]
-                hole = [110, 110]
-                
+                corner1 = list((bpy.data.objects['MARKER_Corner_X-Y-'].location - ROADOBJ.location).xy)
+                corner2 = list((bpy.data.objects['MARKER_Corner_X+Y-'].location - ROADOBJ.location).xy)
+                corner3 = list((bpy.data.objects['MARKER_Corner_X+Y+'].location - ROADOBJ.location).xy)
+                corner4 = list((bpy.data.objects['MARKER_Corner_X-Y+'].location - ROADOBJ.location).xy)
+                corners = [corner1, corner2, corner3, corner4]
+                hole = list((bpy.data.objects['MARKER_Inside'].location - ROADOBJ.location).xy)
                 borderBM = bmesh.new()
 
                 for corner in corners:
@@ -572,7 +586,6 @@ class RunRoadBaking(bpy.types.Operator):
                 tmpMesh = bpy.data.meshes.new("tmpMesh")
                 borderBM.to_mesh(tmpMesh)
                 new_mesh.from_mesh(tmpMesh)
-                
                 triangulizedSurface = RunRoadBaking.triangulizeAround(new_mesh, corners, hole)
                 triangulizedSurface.location = location
                 terrainFragments.append(triangulizedSurface)
@@ -679,12 +692,58 @@ class RunRoadBaking(bpy.types.Operator):
         return tmpObject
     
 
+class ExportPrep(bpy.types.Operator):
+    bl_idname = "wm.export_prep"
+    bl_label = "Prepare export"
+    def execute(self, context):
+        bpy.ops.object.select_all(action='DESELECT')
+        
+        lColl = bpy.context.view_layer.layer_collection.children['COLONLY']
+        bpy.context.view_layer.active_layer_collection = lColl
+        for colliderObj in bpy.data.collections["FINAL"].objects:
+            new_obj = colliderObj.copy()
+            new_obj.data = colliderObj.data.copy()
+            bpy.data.collections['COLONLY'].objects.link(new_obj)
+#            colliderObj.select_set(True)
+#            lColl = bpy.context.view_layer.layer_collection.children['COLONLY']
+#            bpy.context.view_layer.active_layer_collection = lColl
+#            bpy.ops.object.duplicate()
+        
+        
+        mapObj = bpy.data.objects['Map']
+        bpy.ops.mesh.separate(type='MATERIAL')
+        
+        objectsByMaterial = {}
+
+        colonlyObjects = bpy.data.collections["COLONLY"].objects
+        for colliderObj in colonlyObjects:
+            colliderObj.select_set(True)
+            bpy.ops.mesh.separate(type='MATERIAL')
+        print("SEPARATION done")
+        
+        for colliderObj in bpy.data.collections["COLONLY"].objects:
+            materialType = colliderObj.material_slots[0].material['materialType']
+            if not materialType in objectsByMaterial:
+                objectsByMaterial[materialType] = []
+            objectsByMaterial[materialType].append(colliderObj)
+        
+        print("SORTING done")
+        for key, objects in objectsByMaterial.items():
+            bpy.ops.object.select_all(action='DESELECT')
+            for o in objects:
+                o.select_set(True)
+            bpy.context.view_layer.objects.active = objects[0]
+            bpy.ops.object.join()
+            bpy.context.object.name = key + "-colonly"
+        
+        return {'FINISHED'}
 
 
 def register():
     bpy.utils.register_class(HelloWorldPanel)
     bpy.utils.register_class(RunRoadBaking)
     bpy.utils.register_class(MySettings)
+    bpy.utils.register_class(ExportPrep)
     
     bpy.types.Scene.myPropertiesasd = bpy.props.PointerProperty(type=MySettings)
 
@@ -692,6 +751,7 @@ def unregister():
     bpy.utils.unregister_class(HelloWorldPanel)
     bpy.utils.unregister_class(RunRoadBaking)
     bpy.utils.unregister_class(MySettings)
+    bpy.utils.unregister_class(ExportPrep)
     del bpy.types.Scene.myPropertiesasd
 
 if __name__ == "__main__":
